@@ -3,9 +3,23 @@ import configparser
 import requests
 import logging
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+import psycopg2
+
+
+hostname = 'localhost'
+database = 'Library_managment'
+username = 'postgres'
+password = '1234'
+port_id = 5432
+
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 CORS(app)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:1234@localhost:5432/Library_management'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 # Configure logging to DEBUG level for detailed logs
 logging.basicConfig(
@@ -42,6 +56,15 @@ def viewer():
 
 # API route to fetch description from Gemini API
 @app.route('/api/description', methods=['GET'])
+def get_book():
+    conn = psycopg2.connect("dbname=your_existing_db user=username password=password")
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM book")  # Use your actual table name
+    books = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify(books)
+
 def get_description():
     entity_name = request.args.get('name')
     logging.debug(f"Received request for entity name: {entity_name}")  # Changed to DEBUG
@@ -120,4 +143,20 @@ def get_description():
         return jsonify({'error': 'An unexpected error occurred', 'message': str(e)}), 500
 
 if __name__ == '__main__':
+    with app.app_context():
+        # Create tables if they don't exist
+        db.create_all()
+        
+        # Optional: Insert initial data
+        try:
+            from sqlalchemy import text
+            with open('schema.sql') as f:
+                db.session.execute(text(f.read()))
+            with open('data.sql') as f:
+                db.session.execute(text(f.read()))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logging.warning(f"Could not initialize data: {e}")
+    
     app.run(debug=True)
