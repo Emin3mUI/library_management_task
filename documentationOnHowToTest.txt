@@ -33,33 +33,62 @@ python app.py
 
 
 ## PostgreSQL Endpoints
+
+### 1️⃣ Add a Book (POST)
 $body = @{
-  book_id = "BK010"
-  title = "New Book"
-  author = "Author X"
-  genre = "Genre"
+  book_id   = "BK011"
+  title     = "New Book1"
+  author    = "Author X1"
+  genre     = "Genre"
   publisher = "Pub House"
-  quantity = 5
+  quantity  = 5
   available = $true
-  place = "Shelf Z1"
+  place     = "Shelf Z2"
 } | ConvertTo-Json -Depth 2
 
-Invoke-RestMethod -Uri http://127.0.0.1:5000/books -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/books `
+  -Method POST `
+  -Body $body `
+  -ContentType "application/json"
 
 
-### List All books (GET)
+### 2️⃣ List All Books (GET)
 Invoke-RestMethod -Uri http://127.0.0.1:5000/books
 
-### Borrow a Book (POST)
+
+### 3️⃣ Borrow a Book (POST)
 $body = @{
-  book_id = "BK001"
+  book_id        = "BK001"
   borrower_email = "user1@library.com"
-  start_date = "2025-05-27"
+  start_date     = "2025-05-29"
+  return_date    = "2025-06-10"
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/borrow `
+  -Method POST `
+  -Body $body `
+  -ContentType "application/json"
+
+
+### 4️⃣ Return a Book (POST)
+$body = @{
+  book_id     = "BK001"
   return_date = "2025-06-10"
-} | ConvertTo-Json -Depth 2
+} | ConvertTo-Json
 
-Invoke-RestMethod -Uri http://127.0.0.1:5000/borrow -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/return `
+  -Method POST `
+  -Body $body `
+  -ContentType "application/json"
 
+
+### 5️⃣ Clear All Borrowing Data (POST)
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/clear-borrowings `
+  -Method POST 
 
 
 # ---------------------NEO4J ENDPOINTS--------------------------
