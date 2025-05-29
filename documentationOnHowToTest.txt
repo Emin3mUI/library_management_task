@@ -1,0 +1,92 @@
+from pathlib import Path
+
+# Content for README.md
+readme_md = """
+#  Library Management System (PostgreSQL + Neo4j)
+
+This project demonstrates a hybrid library management system built using Flask, PostgreSQL (relational), and Neo4j (graph). The goal is to explore how the same data can be modeled and queried using both relational and graph-based approaches.
+
+---
+
+##  Features
+
+- Add, list, and delete books via PostgreSQL
+- Borrow and return books (PostgreSQL + Neo4j)
+- Graph visualization of borrowed relationships in Neo4j
+- Dual API routes for both database engines
+
+---
+
+##  How to Run
+
+Make sure you have:
+- PostgreSQL running locally (default port 5432)
+- Neo4j Desktop running and accessible on bolt://localhost:7687
+- Python environment with required packages
+
+### Install dependencies
+
+```bash
+pip install flask flask-cors psycopg2 neo4j
+python app.py
+
+
+
+## PostgreSQL Endpoints
+$body = @{
+  book_id = "BK010"
+  title = "New Book"
+  author = "Author X"
+  genre = "Genre"
+  publisher = "Pub House"
+  quantity = 5
+  available = $true
+  place = "Shelf Z1"
+} | ConvertTo-Json -Depth 2
+
+Invoke-RestMethod -Uri http://127.0.0.1:5000/books -Method POST -Body $body -ContentType "application/json"
+
+
+### List All books (GET)
+Invoke-RestMethod -Uri http://127.0.0.1:5000/books
+
+### Borrow a Book (POST)
+$body = @{
+  book_id = "BK001"
+  borrower_email = "user1@library.com"
+  start_date = "2025-05-27"
+  return_date = "2025-06-10"
+} | ConvertTo-Json -Depth 2
+
+Invoke-RestMethod -Uri http://127.0.0.1:5000/borrow -Method POST -Body $body -ContentType "application/json"
+
+
+
+# ---------------------NEO4J ENDPOINTS--------------------------
+
+## Test that it works correctly
+Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/books
+
+
+### Borrow a Book (Graph - POST)
+$body = @{
+  book_id = "BK003"
+  borrower_email = "user2@library.com"
+  start_date = "2025-05-27"
+  return_date = "2025-06-10"
+} | ConvertTo-Json -Depth 2
+
+Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/borrow -Method POST -Body $body -ContentType "application/json"
+
+
+###  Return a Book (Graph - POST)
+$body = @{
+  book_id = "BK003"
+  borrower_email = "user2@library.com"
+} | ConvertTo-Json -Depth 2
+
+Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/return -Method POST -Body $body -ContentType "application/json"
+
+
+###  List Books Borrowed by a User (Graph - GET)
+Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/borrowed/user1@library.com
