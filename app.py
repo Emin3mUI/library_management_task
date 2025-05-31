@@ -9,19 +9,19 @@ from datetime import datetime
 conn = psycopg2.connect(
     dbname="Library_Management",
     user="postgres",
-    password="",    # ← your DB password here
+    password="",  
     host="localhost",
     port="5432"
 )
 cur = conn.cursor()
 
-# ------------ Neo4j Connection (optional) ------------ #
+# ------------ Neo4j Conn ------------ #
 neo4j_driver = GraphDatabase.driver(
     "bolt://localhost:7687",
-    auth=("neo4j", "12345678")  # ← your Neo4j creds
+    auth=("neo4j", "12345678") 
 )
 
-# ------------ Flask App Setup ------------ #
+# ------------ Flask Setup ------------ #
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 logging.basicConfig(level=logging.DEBUG)

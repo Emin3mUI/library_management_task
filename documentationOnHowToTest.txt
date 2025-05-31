@@ -34,7 +34,7 @@ python app.py
 
 ## PostgreSQL Endpoints
 
-### 1️⃣ Add a Book (POST)
+### 1️ Add a Book (POST)
 $body = @{
   book_id   = "BK011"
   title     = "New Book1"
@@ -53,11 +53,11 @@ Invoke-RestMethod `
   -ContentType "application/json"
 
 
-### 2️⃣ List All Books (GET)
+### 2️ List All Books (GET)
 Invoke-RestMethod -Uri http://127.0.0.1:5000/books
 
 
-### 3️⃣ Borrow a Book (POST)
+### 3️ Borrow a Book (POST)
 $body = @{
   book_id        = "BK001"
   borrower_email = "user1@library.com"
@@ -72,7 +72,7 @@ Invoke-RestMethod `
   -ContentType "application/json"
 
 
-### 4️⃣ Return a Book (POST)
+### 4️ Return a Book (POST)
 $body = @{
   book_id     = "BK001"
   return_date = "2025-06-10"
@@ -85,7 +85,7 @@ Invoke-RestMethod `
   -ContentType "application/json"
 
 
-### 5️⃣ Clear All Borrowing Data (POST)
+### 5️ Clear All Borrowing Data (POST)
 Invoke-RestMethod `
   -Uri http://127.0.0.1:5000/clear-borrowings `
   -Method POST 
