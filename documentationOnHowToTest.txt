@@ -36,14 +36,14 @@ python app.py
 
 ### 1️ Add a Book (POST)
 $body = @{
-  book_id   = "BK011"
-  title     = "New Book1"
-  author    = "Author X1"
-  genre     = "Genre"
-  publisher = "Pub House"
-  quantity  = 5
-  available = $true
-  place     = "Shelf Z2"
+  book_id   = "BK001"
+  title     = "The Great Adventure"
+  author    = "Jane Smith"
+  genre     = "Fiction"
+  publisher = "Penguin Books'"
+  quantity  = 5, 
+  available = $TRUE,
+  place     = "Shelf A3"
 } | ConvertTo-Json -Depth 2
 
 Invoke-RestMethod `
@@ -61,8 +61,8 @@ Invoke-RestMethod -Uri http://127.0.0.1:5000/books
 $body = @{
   book_id        = "BK001"
   borrower_email = "user1@library.com"
-  start_date     = "2025-05-29"
-  return_date    = "2025-06-10"
+  start_date     = "2025-08-29"
+  return_date    = "2025-10-10"
 } | ConvertTo-Json
 
 Invoke-RestMethod `
@@ -85,7 +85,13 @@ Invoke-RestMethod `
   -ContentType "application/json"
 
 
-### 5️ Clear All Borrowing Data (POST)
+## 5 Delete a book from the database
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/books/BK001 `
+  -Method DELETE
+
+
+### 6 Clear All Borrowing Data (POST)
 Invoke-RestMethod `
   -Uri http://127.0.0.1:5000/clear-borrowings `
   -Method POST 
@@ -95,6 +101,7 @@ Invoke-RestMethod `
 
 ## Test that it works correctly
 Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/books
+
 
 
 ### Borrow a Book (Graph - POST)

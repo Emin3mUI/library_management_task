@@ -1,20 +1,36 @@
-// /static/js/index.js
+// static/js/index.js
 
-// Load books from backend and render table + dropdowns
+// ---------------------------------------------------
+// 1) Fetch & render the book list (table + dropdowns)
+// ---------------------------------------------------
 async function loadAndRender() {
+  const table        = document.getElementById('book-table');
+  const borrowSelect = document.getElementById('borrowBookId');
+  const returnSelect = document.getElementById('returnBookId');
+
+  // Clear any existing rows / options
+  table.innerHTML        = '';
+  borrowSelect.innerHTML = '<option value="">Select a Book</option>';
+  returnSelect.innerHTML = '<option value="">Select a Book</option>';
+
   try {
-    const resp  = await fetch('/books');
-    const books = await resp.json();
+    const resp = await fetch('/books');
+    console.log('GET /books status:', resp.status, 'content-type:', resp.headers.get('content-type'));
+    const text = await resp.text();
+    console.log('GET /books body:', text);
 
-    const table        = document.getElementById('book-table');
-    const borrowSelect = document.getElementById('borrowBookId');
-    const returnSelect = document.getElementById('returnBookId');
+    if (!resp.ok) {
+      throw new Error(`Server returned ${resp.status}`);
+    }
 
-    // Clear old content
-    table.innerHTML        = '';
-    borrowSelect.innerHTML = '<option value="">Select a Book</option>';
-    returnSelect.innerHTML = '<option value="">Select a Book</option>';
+    let books;
+    try {
+      books = JSON.parse(text);
+    } catch {
+      throw new Error('Invalid JSON from /books');
+    }
 
+    // For each book, append a row and decide which dropdown it belongs in
     books.forEach(b => {
       const tr = document.createElement('tr');
       tr.dataset.id = b.book_id;
@@ -33,87 +49,160 @@ async function loadAndRender() {
       `;
       table.appendChild(tr);
 
-      // Populate dropdowns
+      // Build a <option> for this book
       const opt = document.createElement('option');
-      opt.value = b.book_id;
+      opt.value       = b.book_id;
       opt.textContent = `${b.book_id} — ${b.title}`;
-      if (b.available) borrowSelect.appendChild(opt);
-      else            returnSelect.appendChild(opt);
+
+      if (b.available) {
+        // Only available books go into the “Borrow” dropdown
+        borrowSelect.appendChild(opt);
+      } else {
+        // Already‐borrowed books go into the “Return” dropdown
+        returnSelect.appendChild(opt);
+      }
     });
   } catch (err) {
-    console.error('Error loading books:', err);
-    alert('Failed to load book data.');
+    console.error('loadAndRender error:', err);
+    alert(`Failed to load book data: ${err.message}`);
   }
 }
 
-// Initial load
-window.addEventListener('DOMContentLoaded', loadAndRender);
+// ---------------------------------------------------
+// 2) Utility: Attempt JSON.parse, otherwise show raw
+// ---------------------------------------------------
+async function parseJsonOrThrow(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+}
 
-// Borrow Book
-document.getElementById('borrowForm').addEventListener('submit', async e => {
-  e.preventDefault();
+// ---------------------------------------------------
+// 3) Handle “Borrow Book” form submission
+// ---------------------------------------------------
+async function handleBorrow(event) {
+  event.preventDefault();
+
   const book_id        = document.getElementById('borrowBookId').value;
   const borrower_email = document.getElementById('borrowerName').value.trim();
   const start_date     = document.getElementById('borrowDate').value;
-  // For now we use the same date as return_date
-  const return_date    = start_date;
+  const return_date    = start_date; // Or edit if you want a separate field
 
+  // 3.1) Basic validation
   if (!book_id || !borrower_email || !start_date) {
-    return alert('Please fill in all fields.');
+    return alert('Please fill in all fields before borrowing.');
   }
-  if (!confirm(`Borrow book ${book_id}?`)) return;
+  if (!confirm(`Borrow book ${book_id}?`)) {
+    return;
+  }
 
   try {
     const resp = await fetch('/borrow', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ book_id, borrower_email, start_date, return_date })
     });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error||'Borrow failed');
+    const data = await parseJsonOrThrow(resp);
+    if (!resp.ok) {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+
     alert(data.message);
     await loadAndRender();
+    // Clear the form fields
+    document.getElementById('borrowForm').reset();
   } catch (err) {
-    alert(err.message);
+    console.error('Borrow error:', err);
+    alert(`Borrow failed: ${err.message}`);
   }
-});
+}
 
-// Return Book
-document.getElementById('returnForm').addEventListener('submit', async e => {
-  e.preventDefault();
+// ---------------------------------------------------
+// 4) Handle “Return Book” form submission
+// ---------------------------------------------------
+async function handleReturn(event) {
+  event.preventDefault();
+
   const book_id    = document.getElementById('returnBookId').value;
   const return_date = document.getElementById('returnDate').value;
 
+  // 4.1) Basic validation
   if (!book_id || !return_date) {
-    return alert('Please fill in all fields.');
+    return alert('Please select a book and enter a return date.');
   }
-  if (!confirm(`Return book ${book_id}?`)) return;
+  if (!confirm(`Return book ${book_id}?`)) {
+    return;
+  }
 
   try {
     const resp = await fetch('/return', {
       method: 'POST',
-      headers:{'Content-Type':'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ book_id, return_date })
     });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error||'Return failed');
-    alert(data.message);
-    await loadAndRender();
-  } catch (err) {
-    alert(err.message);
-  }
-});
+    const data = await parseJsonOrThrow(resp);
+    if (!resp.ok) {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
 
-// Clear All Borrowing Data
-document.getElementById('clearDataBtn').addEventListener('click', async () => {
-  if (!confirm('Clear all borrowing data?')) return;
+    alert(data.message);
+    await loadAndRender();
+    // Clear the return form fields
+    document.getElementById('returnForm').reset();
+  } catch (err) {
+    console.error('Return error:', err);
+    alert(`Return failed: ${err.message}`);
+  }
+}
+
+// ---------------------------------------------------
+// 5) Handle “Clear All Borrowing Data” button click
+// ---------------------------------------------------
+async function handleClear(event) {
+  event.preventDefault();
+
+  if (!confirm('Clear all borrowing data? This cannot be undone.')) {
+    return;
+  }
+
   try {
-    const resp = await fetch('/clear-borrowings',{ method:'POST' });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error||'Clear failed');
+    const resp = await fetch('/clear-borrowings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}' // send an empty JSON object so it isn’t a truly empty payload
+    });
+    const data = await parseJsonOrThrow(resp);
+    if (!resp.ok) {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+
     alert(data.message);
     await loadAndRender();
   } catch (err) {
-    alert(err.message);
+    console.error('Clear error:', err);
+    alert(`Clear failed: ${err.message}`);
   }
+}
+
+// ---------------------------------------------------
+// 6) Wire everything up when DOM is ready
+// ---------------------------------------------------
+window.addEventListener('DOMContentLoaded', () => {
+  // Initially fetch and render the table & dropdowns
+  loadAndRender();
+
+  // Hook up Borrow button
+  const borrowForm = document.getElementById('borrowForm');
+  borrowForm.addEventListener('submit', handleBorrow);
+
+  // Hook up Return button
+  const returnForm = document.getElementById('returnForm');
+  returnForm.addEventListener('submit', handleReturn);
+
+  // Hook up Clear All Borrowing Data button
+  const clearBtn = document.getElementById('clearDataBtn');
+  clearBtn.addEventListener('click', handleClear);
 });

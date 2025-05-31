@@ -52,18 +52,46 @@ def get_books():
 
 @app.route('/books', methods=['POST'])
 def add_book():
-    data = request.json
-    cur.execute("""
-        INSERT INTO book
-          (book_id, title, author, genre, publisher, quantity, available, place)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        data['book_id'], data['title'], data['author'], data.get('genre'),
-        data.get('publisher'), data['quantity'], data.get('available', True),
-        data.get('place')
-    ))
-    conn.commit()
-    return jsonify({'message': 'Book added'}), 201
+    try:
+        data = request.json
+        # You can add a quick sanity check:
+        required_keys = ['book_id','title','author','genre','publisher','quantity','available','place']
+        for key in required_keys:
+            if key not in data:
+                return jsonify({'error': f'Missing key "{key}" in JSON payload'}), 400
+
+        cur.execute("""
+            INSERT INTO book
+              (book_id, title, author, genre, publisher, quantity, available, place)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            data['book_id'],
+            data['title'],
+            data['author'],
+            data['genre'],
+            data['publisher'],
+            data['quantity'],
+            data['available'],
+            data['place']
+        ))
+        conn.commit()
+        return jsonify({'message': f'Book {data["book_id"]} added'}), 201
+
+    except psycopg2.IntegrityError as e:
+        conn.rollback()
+        # e.pgcode / e.pgerror hold the Postgres-specific code/message
+        return jsonify({
+            'error': 'Database integrity error',
+            'details': str(e)
+        }), 400
+
+    except Exception as e:
+        conn.rollback()
+        # For any other unexpected exception, return a JSON payload:
+        return jsonify({
+            'error': 'Unexpected server error',
+            'details': str(e)
+        }), 500
 
 @app.route('/books/<book_id>', methods=['DELETE'])
 def delete_book(book_id):
@@ -75,45 +103,68 @@ def delete_book(book_id):
 
 @app.route('/borrow', methods=['POST'])
 def borrow_book():
-    data           = request.json
-    book_id        = data.get('book_id')
-    borrower_email = data.get('borrower_email')
-    start_date_str = data.get('start_date')
-    return_date_str= data.get('return_date')
-
-    # Parse dates
     try:
-        start_date  = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        return_date = datetime.strptime(return_date_str, '%Y-%m-%d').date()
-    except Exception:
-        return jsonify({'error': 'Invalid date format'}), 400
+        data = request.json or {}
+        # Pull fields out of JSON
+        book_id        = data.get('book_id')
+        borrower_email = data.get('borrower_email')
+        sd             = data.get('start_date')
+        rd             = data.get('return_date')
 
-    today = datetime.today().date()
+        # 1) Basic validation: make sure the JSON keys exist
+        missing = [k for k in ('book_id','borrower_email','start_date','return_date') if k not in data]
+        if missing:
+            return jsonify({ 'error': f'Missing JSON keys: {", ".join(missing)}' }), 400
 
-    # 1) Date validation
-    if start_date < today:
-        return jsonify({'error': 'Cannot borrow in the past'}), 400
-    if return_date < start_date:
-        return jsonify({'error': 'Return date before borrow date'}), 400
+        # 2) Parse dates
+        try:
+            start_date  = datetime.strptime(sd, '%Y-%m-%d').date()
+            return_date = datetime.strptime(rd, '%Y-%m-%d').date()
+        except Exception:
+            return jsonify({ 'error': 'Invalid date format. Use YYYY-MM-DD.' }), 400
 
-    # 2) Boolean availability check
-    cur.execute("SELECT available FROM book WHERE book_id = %s", (book_id,))
-    row = cur.fetchone()
-    if not row or not row[0]:
-        return jsonify({'error': 'Book not available'}), 400
+        today = datetime.today().date()
+        if start_date < today:
+            return jsonify({ 'error': 'Cannot borrow in the past' }), 400
+        if return_date < start_date:
+            return jsonify({ 'error': 'Return date before borrow date' }), 400
 
-    # 3) Record the borrowing
-    cur.execute("""
-        INSERT INTO borrowing
-          (borrower_email, book_id, start_date, return_date, is_it_returned)
-        VALUES (%s,%s,%s,%s,%s)
-    """, (borrower_email, book_id, start_date, return_date, False))
+        # 3) Check that borrower exists
+        cur.execute("SELECT 1 FROM borrower WHERE email = %s", (borrower_email,))
+        if cur.fetchone() is None:
+            return jsonify({ 'error': f'No borrower with email {borrower_email}' }), 400
 
-    # 4) Mark the book unavailable
-    cur.execute("UPDATE book SET available = FALSE WHERE book_id = %s", (book_id,))
-    conn.commit()
+        # 4) Check availability
+        cur.execute("SELECT available FROM book WHERE book_id = %s", (book_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({ 'error': f'Book {book_id} not found' }), 404
+        if not row[0]:
+            return jsonify({ 'error': 'Book not available' }), 400
 
-    return jsonify({'message': 'Book borrowed successfully'}), 201
+        # 5) Insert borrowing record
+        cur.execute("""
+            INSERT INTO borrowing
+              (borrower_email, book_id, start_date, return_date, is_it_returned)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (borrower_email, book_id, start_date, return_date, False))
+
+        # 6) Mark book unavailable
+        cur.execute("UPDATE book SET available = FALSE WHERE book_id = %s", (book_id,))
+        conn.commit()
+        return jsonify({ 'message': 'Book borrowed successfully' }), 201
+
+    except Exception as exc:
+        # Roll back on any error
+        conn.rollback()
+        # Log the full stack trace to the Flask console
+        app.logger.exception("Unexpected error in /borrow")
+        # Return a JSON error payload with the Python exception string
+        return jsonify({
+            'error': 'Internal server error in /borrow',
+            'details': str(exc)
+        }), 500
+
 
 @app.route('/return', methods=['POST'])
 def return_book():
@@ -186,7 +237,7 @@ def add_borrower():
     conn.commit()
     return jsonify({'message': 'Borrower registered'}), 201
 
-# -- Neo4j Graph (optional) ------------------------------
+# -- Neo4j Graph  ------------------------------
 
 @app.route('/graph/books', methods=['GET'])
 def graph_books():
