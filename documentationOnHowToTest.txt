@@ -41,8 +41,8 @@ $body = @{
   author    = "Jane Smith"
   genre     = "Fiction"
   publisher = "Penguin Books'"
-  quantity  = 5, 
-  available = $TRUE,
+  quantity  = 5
+  available = $TRUE
   place     = "Shelf A3"
 } | ConvertTo-Json -Depth 2
 
@@ -123,6 +123,3 @@ $body = @{
 
 Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/return -Method POST -Body $body -ContentType "application/json"
 
-
-###  List Books Borrowed by a User (Graph - GET)
-Invoke-RestMethod -Uri http://127.0.0.1:5000/graph/borrowed/user1@library.com

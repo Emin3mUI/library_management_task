@@ -211,19 +211,31 @@ def return_book():
 
 # -- Clear All Borrowing Data ----------------------------
 
+from neo4j.exceptions import ServiceUnavailable
+
 @app.route('/clear-borrowings', methods=['POST'])
 def clear_borrowings():
-    # Delete all borrowing records
-    cur.execute("DELETE FROM borrowing;")
-    # Reset availability on all books
-    cur.execute("UPDATE book SET available = TRUE;")
-    conn.commit()
+    try:
+        # 1) Delete all borrowing records from PostgreSQL
+        cur.execute("DELETE FROM borrowing;")
+        # 2) Reset every book’s available flag
+        cur.execute("UPDATE book SET available = TRUE;")
+        conn.commit()
 
-    # (Optional) Clear Neo4j BORROWED relationships
-    with neo4j_driver.session() as session:
-        session.run("MATCH ()-[r:BORROWED]->() DELETE r")
+        # 3) Try to clear Neo4j relationships, but ignore if Neo4j isn't up
+        try:
+            with neo4j_driver.session() as session:
+                session.run("MATCH ()-[r:BORROWED]->() DELETE r")
+        except ServiceUnavailable:
+            app.logger.warning("Could not connect to Neo4j—skipping graph cleanup.")
 
-    return jsonify({'message': 'All borrowing data reset'}), 200
+        return jsonify({'message': 'All borrowing data reset'}), 200
+
+    except Exception as e:
+        conn.rollback()
+        app.logger.exception("Error in clear-borrowings")
+        return jsonify({'error': 'Failed to clear borrowings', 'details': str(e)}), 500
+
 
 # -- Borrowers --------------------------------------------
 
