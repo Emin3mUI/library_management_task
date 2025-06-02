@@ -187,9 +187,8 @@ async function handleClear(event) {
   }
 }
 
-// ---------------------------------------------------
 // 6) Wire everything up when DOM is ready
-// ---------------------------------------------------
+
 window.addEventListener('DOMContentLoaded', () => {
   // Initially fetch and render the table & dropdowns
   loadAndRender();

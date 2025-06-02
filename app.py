@@ -3,6 +3,7 @@ from flask_cors import CORS
 import psycopg2
 import logging
 from neo4j import GraphDatabase
+from neo4j.exceptions import ServiceUnavailable
 from datetime import datetime
 
 # ------------ PostgreSQL Connection ------------ #
@@ -210,8 +211,6 @@ def return_book():
     return jsonify({'message': 'Book returned successfully'}), 200
 
 # -- Clear All Borrowing Data ----------------------------
-
-from neo4j.exceptions import ServiceUnavailable
 
 @app.route('/clear-borrowings', methods=['POST'])
 def clear_borrowings():
